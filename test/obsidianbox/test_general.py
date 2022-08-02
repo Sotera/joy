@@ -76,7 +76,12 @@ class ValidateGeneral(object):
 
     def run(self):
         for params in test_params:
-            proc = subprocess.Popen([self.paths['exec'], 'output=' + self.tmp_output] + params + [self.paths['pcap']])
+            proc = subprocess.Popen(
+                [self.paths['exec'], f'output={self.tmp_output}']
+                + params
+                + [self.paths['pcap']]
+            )
+
             time.sleep(0.5)
 
             # End the Joy process
@@ -124,8 +129,7 @@ def test_unix_os():
     """
     cur_dir = os.path.dirname(__file__)
 
-    paths = dict()
-    paths['exec'] = os.path.join(cur_dir, '../../bin/joy')
+    paths = {'exec': os.path.join(cur_dir, '../../bin/joy')}
     paths['pcap'] = os.path.join(cur_dir, '../pcaps/sample.pcap')
 
     validate_general = ValidateGeneral(paths)
@@ -140,8 +144,7 @@ def test_windows_os():
     """
     cur_dir = os.path.dirname(__file__)
 
-    paths = dict()
-    paths['exec'] = os.path.join(cur_dir, '../../bin/win-joy.exe')
+    paths = {'exec': os.path.join(cur_dir, '../../bin/win-joy.exe')}
     paths['pcap'] = os.path.join(cur_dir, '../pcaps/sample.pcap')
 
     validate_general = ValidateGeneral(paths)

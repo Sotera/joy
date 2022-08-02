@@ -56,8 +56,7 @@ class DictStreamIterator(object):
         return self
 
     def next(self):
-        n = dict()
-        return n
+        return {}
 
 
 class DictStreamIteratorFromFile(DictStreamIterator):
@@ -112,10 +111,14 @@ class DictStreamIteratorFromFile(DictStreamIterator):
                         self.lineCount += 1
                         return tmp
             except StopIteration:
-                sys.stderr.write("read " + str(self.lineCount) + " lines\n")
+                sys.stderr.write(f"read {str(self.lineCount)}" + " lines\n")
 
                 if self.badLineCount > 0:
-                    sys.stderr.write("warning: could not parse " + str(self.badLineCount) + " lines\n")
+                    sys.stderr.write(
+                        f"warning: could not parse {str(self.badLineCount)}"
+                        + " lines\n"
+                    )
+
 
                 self._cleanup()
                 raise
@@ -150,8 +153,9 @@ class DictStreamSelectIterator(DictStreamIterator):
     def next(self):
         while True:
             tmp = self.source.next()
-            output = self.template.copy_selected_elements(self.template.template, tmp)
-            if output:
+            if output := self.template.copy_selected_elements(
+                self.template.template, tmp
+            ):
                 return output
 
 
@@ -162,9 +166,7 @@ class DictStreamNormalizeIterator(DictStreamIterator):
 
     def next(self):
         tmp = self.source.next()
-        output = self.template.normalize_selected_elements(self.template.template, tmp)
-
-        return output
+        return self.template.normalize_selected_elements(self.template.template, tmp)
 
 class DictStreamApplyIterator(DictStreamIterator):
     def __init__(self, source, elements, func):
@@ -174,9 +176,9 @@ class DictStreamApplyIterator(DictStreamIterator):
 
     def next(self):
         tmp = self.source.next()
-        output = self.template.apply_to_selected_elements(self.template.template, tmp, self.func)
-
-        return output
+        return self.template.apply_to_selected_elements(
+            self.template.template, tmp, self.func
+        )
 
     
 class DictStreamEnrichIterator(DictStreamIterator):
@@ -188,8 +190,7 @@ class DictStreamEnrichIterator(DictStreamIterator):
 
     def next(self):
         nextval = self.source.next()
-        tmp = self.function(nextval, self.kwargs)
-        if tmp:
+        if tmp := self.function(nextval, self.kwargs):
             nextval[self.name] = tmp
         return nextval
 
@@ -203,8 +204,7 @@ class DictStreamEnrichIntoIterator(DictStreamIterator):
 
     def next(self):
         nextval = self.source.next()
-        tmp = self.function(nextval, self.kwargs)
-        if tmp:
+        if tmp := self.function(nextval, self.kwargs):
             if self.name not in nextval:
                 nextval[self.name] = {}
             for key, value in tmp.items():
@@ -214,7 +214,7 @@ class DictStreamEnrichIntoIterator(DictStreamIterator):
 class DictStreamDistributionIterator(DictStreamIterator):
     def __init__(self, source, indent=None):
         self.source = source
-        self.dist = dict()
+        self.dist = {}
         self.total = 0
         self.indent = indent
 
@@ -258,7 +258,7 @@ Dictionary Processor Classes
 
 class DictStreamProcessor(object):
     def __init__(self, indent=None):
-        self.obj_set = list()
+        self.obj_set = []
         self.indent = indent
 
     def main_process(self, obj):
@@ -286,7 +286,7 @@ class DictStreamProcessor(object):
 class DictStreamGroupProcessor(DictStreamProcessor):
     def __init__(self, fpobj, field):
         self.fpobj = fpobj
-        self.dict = dict()
+        self.dict = {}
         self.field = field
         self.template = SleuthTemplateDict(field)
 
@@ -309,8 +309,8 @@ class DictStreamGroupProcessor(DictStreamProcessor):
 
 class DictStreamSumProcessor(DictStreamProcessor):
     def __init__(self, sumvars, indent=None):
-        self.sums = dict()
-        self.fixed_fields = dict()
+        self.sums = {}
+        self.fixed_fields = {}
         self.total = 0
         self.sumvars = sumvars
         self.indent = indent
@@ -353,7 +353,7 @@ class DictStreamSumProcessor(DictStreamProcessor):
 
 class DictStreamDistributionProcessor(DictStreamProcessor):
     def __init__(self, indent=None):
-        self.dist = dict()
+        self.dist = {}
         self.total = 0
         self.indent = indent
         
@@ -398,11 +398,11 @@ class SleuthTemplateDict(object):
         needArg = False
         for x in re.split('([\{\}\[\],])', s):
             if x == '':
-                pass
-            elif x == '{' or x == '[':
+                continue
+            if x in ['{', '[']:
                 t += x
                 needArg = False
-            elif x == '}' or x == ']' or x == ',':
+            elif x in ['}', ']', ',']:
                 if needArg:
                     t += "None"
                     needArg = False
@@ -417,67 +417,47 @@ class SleuthTemplateDict(object):
         return eval(t)
 
     def copy_selected_elements(self, tmplDict, obj):
-        outDict = dict()
+        outDict = {}
         for k, v in tmplDict.items():
             if k in obj:
                 if isinstance(v, list):
-                    obj_list = obj[k]
-                    if obj_list:
-                        outDict[k] = list()
+                    if obj_list := obj[k]:
+                        outDict[k] = []
                         for x in obj_list:
                             for y in v:
-                                tmp = self.copy_selected_elements(y, x)
-                                if tmp:
+                                if tmp := self.copy_selected_elements(y, x):
                                     outDict[k].append(tmp)
                         if not outDict[k]:
                             outDict = {}
                 elif isinstance(v, dict):
-                    tmp = self.copy_selected_elements(v, obj[k])
-                    if tmp:
+                    if tmp := self.copy_selected_elements(v, obj[k]):
                         outDict[k] = tmp
-                else:
-                    if v:
-                        if obj[k] == v:
-                            outDict[k] = obj[k]
-                    else:
-                        outDict[k] = obj[k]
-        if outDict:
-            return outDict
-        else:
-            return None
+                elif v and obj[k] == v or not v:
+                    outDict[k] = obj[k]
+        return outDict or None
 
     def get_selected_element(self, tmplDict, obj):
-        outDict = dict()
+        outDict = {}
         for k, v in tmplDict.items():
             if k in obj:
                 if isinstance(v, list):
-                    obj_list = obj[k]
-                    if obj_list:
-                        outDict[k] = list()
+                    if obj_list := obj[k]:
+                        outDict[k] = []
                         if v:
                             for x in obj_list:
                                 for y in v:
-                                    tmp = self.get_selected_element(y, x)
-                                    if tmp:
+                                    if tmp := self.get_selected_element(y, x):
                                         outDict[k].append(tmp)
                         else:
-                            outDict[k] = obj[k] 
+                            outDict[k] = obj[k]
                         if not outDict[k]:
                             outDict = {}
                 elif isinstance(v, dict):
-                    tmp = self.get_selected_element(v, obj[k])
-                    if tmp:
+                    if tmp := self.get_selected_element(v, obj[k]):
                         outDict[k] = tmp
-                else:
-                    if v:
-                        if obj[k] == v:
-                            outDict[k] = obj[k]
-                    else:
-                        outDict[k] = obj[k]
-        if outDict:
-            return outDict
-        else:
-            return None
+                elif v and obj[k] == v or not v:
+                    outDict[k] = obj[k]
+        return outDict or None
 
     def normalize_selected_elements(self, tmplDict, obj):
         if not obj:
@@ -485,8 +465,7 @@ class SleuthTemplateDict(object):
         for k, v in tmplDict.items():
             if k in obj:
                 if isinstance(v, list):
-                    obj_list = obj[k]
-                    if obj_list:
+                    if obj_list := obj[k]:
                         for x in obj_list:
                             for y in v:
                                 self.normalize_selected_elements(y, x)
@@ -502,8 +481,7 @@ class SleuthTemplateDict(object):
         for k, v in tmplDict.items():
             if k in obj:
                 if isinstance(v, list):
-                    obj_list = obj[k]
-                    if obj_list:
+                    if obj_list := obj[k]:
                         for x in obj_list:
                             for y in v:
                                 self.apply_to_selected_elements(y, x, func)
@@ -554,11 +532,8 @@ class SimplePredicate(object):
                 for x in flow:
                     if isinstance(x, dict):
                         x = x.values()[0]
-                        if self.eval(x):
-                            listMatch = True
-                    else:
-                        if self.eval(x):
-                            listMatch = True
+                    if self.eval(x):
+                        listMatch = True
             return listMatch
         elif isinstance(flow, dict):
             # print 'dict flow: ' + str(flow)
@@ -590,15 +565,11 @@ class SimplePredicate(object):
     def match(self, flow):
         if self.matchAll is True:
             return True
-        else:
-            output = self.template.get_selected_element(self.template.template, flow)
-            if output:
-                return self.eval(output.values()[0])
-            else:
-                if self.op == '~' and self.arg == '*':
-                    # True because element is absent from flow
-                    return True
-                return False
+        if output := self.template.get_selected_element(
+            self.template.template, flow
+        ):
+            return self.eval(output.values()[0])
+        return self.op == '~' and self.arg == '*'
 
 
 class AndFilter:
@@ -620,7 +591,7 @@ class OrFilter:
 
 
 def predicate_from_postfix(tokens):
-    stack = list()
+    stack = []
 
     for t in tokens:
         if t == ',':
@@ -648,7 +619,7 @@ def infix_to_postfix(s):
     # Remove whitespace from input string
     s = s.replace(' ', '')
 
-    stack = list()
+    stack = []
     output = []
     for t in re.findall("[\w><=~.*\{\}\[\]?\-+]+|[\(,|\)]", s):
         if '>' in t or '<' in t or '=' in t or '~' in t:
@@ -661,7 +632,7 @@ def infix_to_postfix(s):
                 output.append(topToken)
                 topToken = stack.pop()
         else:
-            while (not stack == []) and (prec[stack[-1]] >= prec[t]):
+            while stack and prec[stack[-1]] >= prec[t]:
                 output.append(stack.pop())
             stack.append(t)
     while stack:
@@ -671,16 +642,10 @@ def infix_to_postfix(s):
 
 class SleuthPredicate(object):
     def __init__(self, pred):
-        if pred:
-            self.pred = predicate_from_postfix(infix_to_postfix(pred))
-        else:
-            self.pred = None
+        self.pred = predicate_from_postfix(infix_to_postfix(pred)) if pred else None
 
     def match(self, flow):
-        if self.pred:
-            return self.pred.match(flow)
-        else:
-            return True
+        return self.pred.match(flow) if self.pred else True
 
 
 class SleuthFileType(object):

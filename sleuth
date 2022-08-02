@@ -118,11 +118,7 @@ def pipeline():
     # Parse command line, and check arguments
     args = parser.parse_args()
 
-    if args.pretty:
-        json_indent = 3
-    else:
-        json_indent = None
-
+    json_indent = 3 if args.pretty else None
     # Select flow processor
     #
     fp = DictStreamProcessor(indent=json_indent)

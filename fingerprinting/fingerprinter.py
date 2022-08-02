@@ -61,7 +61,7 @@ class Fingerprinter:
         self.port = port
         self.tls = TLSFingerprint(database)
 
-        if output == None:
+        if output is None:
             self.out_file_pointer = None
         elif output == sys.stdout:
             self.out_file_pointer = sys.stdout
@@ -103,10 +103,10 @@ class Fingerprinter:
         if fp_str in self.tls.fp_db:
             fp_ = copy.deepcopy(self.tls.fp_db[fp_str])
             del fp_['tls_features']['cs_mapping']
-            self.write_record(fp_)
         else:
             fp_ = self.tls.gen_unknown_fingerprint(fp_str, False)
-            self.write_record(fp_)
+
+        self.write_record(fp_)
 
 
     def extract_fingerprints(self, input_files, detailed=False):
@@ -138,20 +138,19 @@ class Fingerprinter:
                         break # no data error?
                     ip = eth.data
 
-                    if (type(ip) != dpkt.ip.IP and type(ip) != dpkt.ip6.IP6) or type(ip.data) != dpkt.tcp.TCP:
+                    if (
+                        type(ip) not in [dpkt.ip.IP, dpkt.ip6.IP6]
+                        or type(ip.data) != dpkt.tcp.TCP
+                    ):
                         continue
 
                     tcp = ip.data
                     data = tcp.data
 
-                    if self.port != None:
-                        if not tcp.dport == int(self.port):
-                            continue
+                    if self.port != None and tcp.dport != int(self.port):
+                        continue
 
-                    if type(ip) == dpkt.ip.IP:
-                        add_fam = socket.AF_INET
-                    else:
-                        add_fam = socket.AF_INET6
+                    add_fam = socket.AF_INET if type(ip) == dpkt.ip.IP else socket.AF_INET6
                     flow_key = (socket.inet_ntop(add_fam,ip.src), tcp.sport, socket.inet_ntop(add_fam,ip.dst), tcp.dport)
 
 
@@ -175,7 +174,7 @@ class Fingerprinter:
                 if capture_type == 'offline':
                     break
 
-        if self.out_file_pointer != None and self.out_file_pointer != sys.stdout:
+        if self.out_file_pointer not in [None, sys.stdout]:
             self.out_file_pointer.close()
 
         return data_

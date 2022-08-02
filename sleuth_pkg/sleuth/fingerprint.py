@@ -59,8 +59,9 @@ class fingerprinter(object):
 
     def get_fingerprint(self, flow, kwargs):
         tmp = self.select_template.copy_selected_elements(self.select_template.template, flow)
-        output = self.normalize_template.normalize_selected_elements(self.normalize_template.template, tmp)
-        return output
+        return self.normalize_template.normalize_selected_elements(
+            self.normalize_template.template, tmp
+        )
 
     @classmethod
     def types(cls):
