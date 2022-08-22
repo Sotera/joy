@@ -37,6 +37,7 @@ tls_fingerprint provides backend functionality for fingerprinter.py,
  *
 """
 
+
 import os
 import re
 import ast
@@ -51,23 +52,66 @@ from collections import OrderedDict
 from sys import path
 from tls_constants import *
 
-grease_ = set(['0a0a','1a1a','2a2a','3a3a','4a4a','5a5a','6a6a','7a7a',
-               '8a8a','9a9a','aaaa','baba','caca','dada','eaea','fafa'])
+grease_ = {
+    '0a0a',
+    '1a1a',
+    '2a2a',
+    '3a3a',
+    '4a4a',
+    '5a5a',
+    '6a6a',
+    '7a7a',
+    '8a8a',
+    '9a9a',
+    'aaaa',
+    'baba',
+    'caca',
+    'dada',
+    'eaea',
+    'fafa',
+}
 
-ext_data_extract_ = set(['0001','0005','0007','0008','0009','000a','000b',
-                         '000d','000f','0010','0011','0013','0014','0018',
-                         '001b','001c','002b','002d','0032','5500'])
+
+ext_data_extract_ = {
+    '0001',
+    '0005',
+    '0007',
+    '0008',
+    '0009',
+    '000a',
+    '000b',
+    '000d',
+    '000f',
+    '0010',
+    '0011',
+    '0013',
+    '0014',
+    '0018',
+    '001b',
+    '001c',
+    '002b',
+    '002d',
+    '0032',
+    '5500',
+}
+
 ext_data_extract_ = ext_data_extract_.union(grease_)
 
-cs_mapping_file = os.path.dirname(__file__) + '/resources/cs_mapping.json.gz'
+cs_mapping_file = f'{os.path.dirname(__file__)}/resources/cs_mapping.json.gz'
 with gzip.open(cs_mapping_file,'r') as fp:
     cs_mapping = json.loads(fp.read())
 
-imp_date_cs_file = os.path.dirname(__file__) + '/resources/implementation_date_cs.json.gz'
+imp_date_cs_file = (
+    f'{os.path.dirname(__file__)}/resources/implementation_date_cs.json.gz'
+)
+
 with gzip.open(imp_date_cs_file,'r') as fp:
     imp_date_cs_data = json.loads(fp.read())
 
-imp_date_ext_file = os.path.dirname(__file__) + '/resources/implementation_date_ext.json.gz'
+imp_date_ext_file = (
+    f'{os.path.dirname(__file__)}/resources/implementation_date_ext.json.gz'
+)
+
 with gzip.open(imp_date_ext_file,'r') as fp:
     imp_date_ext_data = json.loads(fp.read())
 
@@ -82,7 +126,7 @@ class TLSFingerprint:
         self.fp_db = {}
         self.tls_params_db = {}
         if fp_database != None:
-            with gzip.open(os.path.dirname(__file__) + '/' + fp_database, 'r') as file_pointer:
+            with gzip.open(f'{os.path.dirname(__file__)}/{fp_database}', 'r') as file_pointer:
                 for line in file_pointer:
                     fp_ = json.loads(line)
                     fp_['str_repr'] = fp_['str_repr'].replace('()','')
@@ -99,7 +143,7 @@ class TLSFingerprint:
 
     def fingerprint(self, data, detailed=False):
         # check TLS version and record/handshake type
-        if self.matcher.match(data[0:11]) == None:
+        if self.matcher.match(data[:11]) is None:
             return None
 
         # bounds checking
@@ -115,7 +159,7 @@ class TLSFingerprint:
         else:
             lit_fp = self.eval_fp_str(fp_str_)
             approx_ = self.find_approx_match(lit_fp)
-            if approx_ == None:
+            if approx_ is None:
                 fp_ = self.gen_unknown_fingerprint(fp_str_)
                 self.fp_db[fp_str_] = fp_
             else:
@@ -188,7 +232,7 @@ class TLSFingerprint:
 
 
     def eval_fp_str(self, fp_str_):
-        fp_str_ = '(' + fp_str_ + ')'
+        fp_str_ = f'({fp_str_})'
         fp_str_ = fp_str_.replace('(','["').replace(')','"]').replace('][','],[')
         new_str_ = fp_str_.replace('["[','[[').replace(']"]',']]')
         while new_str_ != fp_str_:
@@ -211,7 +255,7 @@ class TLSFingerprint:
     def get_ext_from_str(self, exts_):
         ext_l_ = []
         for ext in exts_:
-            ext_type_ = ext[0][0:4]
+            ext_type_ = ext[0][:4]
             ext_type_str_kind = str(int(ext_type_,16))
             if ext_type_str_kind in imp_date_ext_data:
                 ext_type_ = imp_date_ext_data[ext_type_str_kind]['name']
@@ -230,8 +274,7 @@ class TLSFingerprint:
             cs_ = cs_str_[i:i+4]
             if cs_ in imp_date_cs_data:
                 dates_.add(imp_date_cs_data[cs_]['date'])
-        dates_ = list(dates_)
-        dates_.sort()
+        dates_ = sorted(dates_)
         return dates_[-1], dates_[0]
 
 
@@ -372,7 +415,7 @@ class TLSFingerprint:
             return ''
         info = OrderedDict({})
         data = data.decode('hex')
-        ext_len = int(data[0:2].encode('hex'),16)
+        ext_len = int(data[:2].encode('hex'), 16)
         info['supported_groups_list_length'] = ext_len
         info['supported_groups'] = []
         offset = 2
@@ -410,12 +453,12 @@ class TLSFingerprint:
             return ''
         info = OrderedDict({})
         data = data.decode('hex')
-	ext_len = int(data[0:1].encode('hex'),16)
+        ext_len = int(data[:1].encode('hex'), 16)
         info['psk_key_exchange_modes_length'] = ext_len
         mode = int(data[1:2].encode('hex'),16)
-	info['psk_key_exchange_mode'] = TLS_PSK_KEY_EXCHANGE_MODES[mode]
+        info['psk_key_exchange_mode'] = TLS_PSK_KEY_EXCHANGE_MODES[mode]
 
-	return info
+        return info
 
 
     def key_share_client(self, data, length):
@@ -423,7 +466,7 @@ class TLSFingerprint:
             return ''
         info = OrderedDict({})
         data = data.decode('hex')
-        ext_len = int(data[0:2].encode('hex'),16)
+        ext_len = int(data[:2].encode('hex'), 16)
         info['key_share_length'] = ext_len
         info['key_share_entries'] = []
         offset = 2
@@ -462,10 +505,13 @@ class TLSFingerprint:
             return ''
         info = OrderedDict({})
         data = data.decode('hex')
-        info['certificate_status_type'] = TLS_CERTIFICATE_STATUS_TYPE[data[0:1].encode('hex')]
-	offset = 1
+        info['certificate_status_type'] = TLS_CERTIFICATE_STATUS_TYPE[
+            data[:1].encode('hex')
+        ]
+
+        offset = 1
         info['responder_id_list_length'] = int(data[offset:offset+2].encode('hex'),16)
-	offset += info['responder_id_list_length'] + 2
+        offset += info['responder_id_list_length'] + 2
         info['request_extensions_length'] = int(data[offset:offset+2].encode('hex'),16)
         offset += info['request_extensions_length'] + 2
 
@@ -513,15 +559,12 @@ class TLSFingerprint:
                 cs_map_.append(cs_mapping[cs_])
             else:
                 try:
-                    t_ = {}
-                    t_['strength'] = 'unknown'
-                    t_['color'] = 'black'
                     w_idx = cs_.split('_').index('WITH')
                     tok = cs_.split('_')
-                    t_['hash'] = tok[-1]
+                    t_ = {'strength': 'unknown', 'color': 'black', 'hash': tok[-1]}
                     tmp = tok[w_idx+1]
                     for i in range(w_idx+2,len(tok)-1):
-                        tmp += '_' + tok[i]
+                        tmp += f'_{tok[i]}'
                     t_['enc'] = tmp
                     t_['auth'] = tmp
                     t_['sig'] = tok[2]
@@ -541,15 +584,15 @@ class TLSFingerprint:
         ]
         output = ''
 
-        # parse protocol version 
-        output += '(' + s[0:4] + ')'
+        # parse protocol version
+        output += '(' + s[:4] + ')'
 
         # parse ciphersuite offer vector
         cs_len = s[4:8]
         output += '('
-        cs_data_len = int(cs_len, 16)*2    
+        cs_data_len = int(cs_len, 16)*2
         cs_vec = s[8:8+cs_data_len]
-        output += cs_vec + ')'
+        output += f'{cs_vec})'
 
         if len(s) <= 8+cs_data_len:
             return output
@@ -558,9 +601,9 @@ class TLSFingerprint:
         ext_index = 8+cs_data_len
         ext_len = s[ext_index:ext_index+4]
         output += '('
-        ext_data_len = int(ext_len, 16)*2 
+        ext_data_len = int(ext_len, 16)*2
         ext_data = s[ext_index+4:ext_index+4+ext_data_len]
-        x_index = 0    
+        x_index = 0
         while x_index + 8 <= len(ext_data):
             x_type = ext_data[x_index+0:x_index+4]
             x_len  = ext_data[x_index+4:x_index+8]
@@ -611,45 +654,30 @@ class SequenceAlignment:
 #   in a TLS fingerprint
 def f_similarity(a, b):
     # the two elements match
-    if a == b:
-        return 1.0
-    return 0.0
+    return 1.0 if a == b else 0.0
 
 
 def get_tls_params(fp_):
-    cs_ = []
-    for i in range(0,len(fp_[1][0]),4):
-        cs_.append(fp_[1][0][i:i+4])
+    cs_ = [fp_[1][0][i:i+4] for i in range(0,len(fp_[1][0]),4)]
     cs_4_ = get_ngram(cs_, 4)
 
     ext_ = []
     if len(fp_) > 2:
-        for t_ext_ in fp_[2]:
-            ext_.append('ext_' + t_ext_[0][0:4] + '::' + t_ext_[0][4:])
-
+        ext_.extend('ext_' + t_ext_[0][:4] + '::' + t_ext_[0][4:] for t_ext_ in fp_[2])
     return [cs_4_, ext_]
 
 def get_sequence(fp_):
-    seq = []
     cs_ = fp_[1][0]
-    for i in range(0,len(cs_),4):
-        seq.append(cs_[i:i+4])
+    seq = [cs_[i:i+4] for i in range(0,len(cs_),4)]
     ext_ = []
     if len(fp_) > 2:
-        for t_ext_ in fp_[2]:
-            seq.append('ext_' + t_ext_[0][0:4] + '::' + t_ext_[0][4:])
+        seq.extend('ext_' + t_ext_[0][:4] + '::' + t_ext_[0][4:] for t_ext_ in fp_[2])
     return seq
 
 
 def get_ngram(l, ngram):
-    l_ = []
-    for i in range(0,len(l)-ngram):
-        s_ = ''
-        for j in range(ngram):
-            s_ += l[i+j]
-	l_.append(s_)
-    if len(l_) == 0:
-        l_ = l
-    return l_
+    return [
+        ''.join(l[i + j] for j in range(ngram)) for i in range(len(l) - ngram)
+    ] or l
 
 

@@ -119,10 +119,7 @@ if __name__ == "__main__":
               'error': logging.ERROR,
               'critical': logging.CRITICAL}
 
-    log_level = None
-    if args.log_level:
-        log_level = LEVELS[args.log_level.lower()]
-
+    log_level = LEVELS[args.log_level.lower()] if args.log_level else None
     log_file = None
     if args.log_file:
         logging.basicConfig(

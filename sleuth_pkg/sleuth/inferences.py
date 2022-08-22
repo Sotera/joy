@@ -63,16 +63,10 @@ def tls_fp_dict_init():
 def grease_normalize(s):
     g = [ '0a0a', '1a1a', '2a2a', '3a3a', '4a4a', '5a5a', '6a6a', '7a7a',
           '8a8a', '9a9a', 'aaaa', 'baba', 'caca', 'dada', 'eaea', 'fafa' ]
-    if s in g:
-        return '0a0a'
-    else:
-        return s
+    return '0a0a' if s in g else s
 
 def grease_normalize_array(s):
-    output = ''
-    for i in range(0, len(s), 4):
-        output += grease_normalize(s[i:i+4])
-    return output
+    return ''.join(grease_normalize(s[i:i+4]) for i in range(0, len(s), 4))
 
             
 def hex_fp_normalize(s):
@@ -82,31 +76,31 @@ def hex_fp_normalize(s):
         13,        # signature_algorithms
         43         # supported_versions  
     ]
-    
+
     output = ''
 
-    # parse protocol version 
-    output += s[0:4]
+    # parse protocol version
+    output += s[:4]
 
     # parse ciphersuite offer vector
     cs_len = s[4:8]
     output += cs_len
-    
-    cs_data_len = int(cs_len, 16)*2    
+
+    cs_data_len = int(cs_len, 16)*2
     cs_vec = s[8:8+cs_data_len]
     output += grease_normalize_array(cs_vec)
-        
+
     # parse client extensions, if present
     ext_index = 8+cs_data_len
     ext_len = s[ext_index:ext_index+4]
     if ext_len == '':
         return output
     output += ext_len
-    
-    ext_data_len = int(ext_len, 16)*2 
+
+    ext_data_len = int(ext_len, 16)*2
     ext_data = s[ext_index+4:ext_index+4+ext_data_len]
 
-    x_index = 0    
+    x_index = 0
     while x_index + 8 <= len(ext_data):
         x_type = ext_data[x_index+0:x_index+4]
         x_len  = ext_data[x_index+4:x_index+8]
@@ -120,13 +114,7 @@ def hex_fp_normalize(s):
 
 
 def element_is_parent(s):
-    if s:
-        if s[0] is '(' and s[1] is '(':
-            return True
-        else:
-            return False
-    else:
-        return False
+    return s[0] is '(' and s[1] is '(' if s else False
 
 def get_next_element(s):
     if s is '':
@@ -139,17 +127,16 @@ def get_next_element(s):
             level = level + 1
         return '', '', -level
 
-    if True:
-        level = 0
-        while s[level] is '(':
-            level = level + 1
+    level = 0
+    while s[level] is '(':
+        level += 1
 
-        if level is 0:
-            return '', '', 0
+    if level is 0:
+        return '', '', 0
 
-        tmp =  string.split(s[level:], ')', 1)
-        tmp.append(level-1)
-        return tmp
+    tmp =  string.split(s[level:], ')', 1)
+    tmp.append(level-1)
+    return tmp
 
 def print_out_structured_data(s):
     current_level = 0
@@ -166,51 +153,49 @@ def structured_fp_normalize(s):
         13,        # signature_algorithms
         43         # supported_versions  
     ]
-    
+
     output = ''
 
     # parse protocol version 
     element, s, level = get_next_element(s)
-    output += '(' + element + ')'
+    output += f'({element})'
 
     # parse ciphersuite offer vector
     element, s, level = get_next_element(s)
-    output += '(' + grease_normalize(element) + ')'
-    
+    output += f'({grease_normalize(element)})'
+
     # parse client extensions, if present
     output += '('
     while s is not '' and s is not ')':
         element, s, level = get_next_element(s)
-        typecode = element[0:4]
+        typecode = element[:4]
         data = element[4:]
-        output += '(' + grease_normalize(typecode) + grease_normalize_array(data) + ')'
+        output += f'({grease_normalize(typecode)}{grease_normalize_array(data)})'
     output += ')'
-        
+
     return output
 
 
 def tls_inference(f, kwargs):
     global tls_fp_dict
-    
+
     if not tls_fp_dict:
         tls_fp_dict_init()
         # print json.dumps(tls_fp_dict)
 
-    if 'fingerprints' in f:
-        if 'tls' in f['fingerprints']:
+    if 'fingerprints' in f and 'tls' in f['fingerprints']:
+        # get tls fingerprint value from object
+        #            
+        fpvalue = json.dumps(f['fingerprints']['tls'])
+        fpvalue = fpvalue.strip('"')
 
-            # get tls fingerprint value from object
-            #            
-            fpvalue = json.dumps(f['fingerprints']['tls'])
-            fpvalue = fpvalue.strip('"')
-
-            # normalize GREASE values, then look up inferences
-            #
-            fpvalue = structured_fp_normalize(fpvalue)
-            if fpvalue in tls_fp_dict:
-                return {'tls': tls_fp_dict[fpvalue]}
-            else:
-                return {'tls': 'unknown fingerprint' }
+        # normalize GREASE values, then look up inferences
+        #
+        fpvalue = structured_fp_normalize(fpvalue)
+        if fpvalue in tls_fp_dict:
+            return {'tls': tls_fp_dict[fpvalue]}
+        else:
+            return {'tls': 'unknown fingerprint' }
 
     return None
 

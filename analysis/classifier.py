@@ -64,12 +64,9 @@ class LogRegClassifier:
 
         out = list(self.logreg.predict_proba(data))
 
-        if labels == None:
+        if labels is None:
             return out, None, None
-        correct = 0
-        for i in range(len(out)):
-            if self.get_label(out[i]) == labels[i]:
-                correct += 1
+        correct = sum(self.get_label(out[i]) == labels[i] for i in range(len(out)))
         acc = correct/float(len(out))
 
         return out, acc, correct
@@ -81,11 +78,7 @@ class LogRegClassifier:
         return self.logreg.coef_, self.logreg.intercept_
 
     def get_num_nonzero_params(self):
-        tmp = 0
-        for x in self.logreg.coef_[0]:
-            if x != 0.0:
-                tmp += 1
-        return tmp
+        return sum(x != 0.0 for x in self.logreg.coef_[0])
 
     def CV(self, data, labels, folds=10):
         self.is_cv = True
@@ -104,15 +97,15 @@ class LogRegClassifier:
         for i in range(folds):
             start = int((i/float(folds))*len(data))
             end = int(((i+1)/float(folds))*len(data))
-            train_data = data[0:start]+data[end:]
-            train_labels = labels[0:start]+labels[end:]
+            train_data = data[:start] + data[end:]
+            train_labels = labels[:start] + labels[end:]
             test_data = data[start:end]
             test_labels = labels[start:end]
             self.train(train_data,train_labels)
 #            self.train(train_data+test_data,train_labels+test_labels)
             out,acc,correct = self.test(test_data,test_labels)
             self.non_zero_params.append(self.get_num_nonzero_params())
-            
+
             out_cv.extend(out)
             acc_cv.append(acc)
             correct_cv.append(correct)

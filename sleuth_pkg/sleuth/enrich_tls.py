@@ -68,10 +68,14 @@ class Policy:
             self.max_seclevel = max(self.classifications.values())
 
     def seclevel(self, x):
-        for classification, value in self.classifications.iteritems():
-            if x == value:
-                return classification
-        return "unknown"
+        return next(
+            (
+                classification
+                for classification, value in self.classifications.iteritems()
+                if x == value
+            ),
+            "unknown",
+        )
 
 
 def check_compliance(compliance_policy, scs):
@@ -99,9 +103,8 @@ def check_compliance(compliance_policy, scs):
 
             if compliance_policy not in compliance_data:
                 return "unknown - undefined policy"
-            else:
-                scs_desc = check_data["tls_params"][scs]["desc"]
-                return "yes" if scs_desc in compliance_data[compliance_policy] else "no"
+            scs_desc = check_data["tls_params"][scs]["desc"]
+            return "yes" if scs_desc in compliance_data[compliance_policy] else "no"
 
     return "error loading file"
     
@@ -114,22 +117,23 @@ def audit_certs_issuer(certs, trusted_ca_list):
     try:
         top_cert_issuer = certs[-1]["issuer"]
 
-        org_name = None
-        for entry in top_cert_issuer:
-            if "organizationName" in entry:
-                org_name = entry["organizationName"]
-                break
+        org_name = next(
+            (
+                entry["organizationName"]
+                for entry in top_cert_issuer
+                if "organizationName" in entry
+            ),
+            None,
+        )
+
     except KeyError:
         return None
 
-    if org_name:
-        if org_name not in trusted_ca_list:
-            return 'CA not trusted: ' + org_name
-    else:
+    if not org_name:
         # Didn't find org_name in cert
         return "CA is none"
 
-    return None
+    return None if org_name in trusted_ca_list else f'CA not trusted: {org_name}'
 
 
 def get_seclevel_with_param(policy, attr, value, param):
@@ -145,14 +149,14 @@ def get_seclevel_with_param(policy, attr, value, param):
     """
     current_seclevel = None
 
-    if param == None:
+    if param is None:
         return policy.rules[attr][value]["default"]
 
     try:
-        if attr == "kex":
-            param_rules = policy.rules[attr][value]["client_key_length"]
-        elif attr == "cert_sig_alg":
+        if attr == "cert_sig_alg":
             param_rules = policy.rules[attr][value]["sig_key_size"]
+        elif attr == "kex":
+            param_rules = policy.rules[attr][value]["client_key_length"]
     except KeyError:
         # Nothing to compare
         return policy.max_seclevel
@@ -210,12 +214,11 @@ def get_certs_seclevel(policy, certs):
         # fetch min seclevel element based on whether or not 'unknown' elements should be reported.
         # default here is 'report'
         if unknowns == "ignore":
-            certs_seclevel_floor = min([x for x in certs_seclevels if x != UNKNOWN])
+            certs_seclevel_floor = min(x for x in certs_seclevels if x != UNKNOWN)
         else:
             certs_seclevel_floor = min(certs_seclevels)
 
-        ca_result = audit_certs_issuer(certs, policy.trusted_ca_list)
-        if ca_result:
+        if ca_result := audit_certs_issuer(certs, policy.trusted_ca_list):
             concerns.append(ca_result)
 
     else:
@@ -255,26 +258,31 @@ def get_scs_seclevel(policy, scs, client_key_length):
 
             current_seclevel = UNKNOWN
 
-            if alg_type in policy.rules:
-                if alg_value in policy.rules[alg_type]:
-                    if alg_type == "kex":
-                        current_seclevel = get_seclevel_with_param(policy, alg_type, alg_value, client_key_length)
-                    else:
-                        current_seclevel = policy.rules[alg_type][alg_value]
+            if (
+                alg_type in policy.rules
+                and alg_value in policy.rules[alg_type]
+            ):
+                if alg_type == "kex":
+                    current_seclevel = get_seclevel_with_param(policy, alg_type, alg_value, client_key_length)
+                else:
+                    current_seclevel = policy.rules[alg_type][alg_value]
 
             # build a list of items whose seclevel falls below the failure_threshold
             # and the value that caused the failure
             if current_seclevel <= policy.failure_threshold:
-                concern_string = alg_type + " - " + alg_value
+                concern_string = f"{alg_type} - {alg_value}"
                 if alg_type == "kex":
-                    concern_string += " client_key_length " + str(client_key_length)
+                    concern_string += f" client_key_length {str(client_key_length)}"
                 concerns.append(concern_string)
             seclevel_inventory[alg_type] = current_seclevel
 
         # fetch min seclevel element based on whether or not 'unknown' elements should be reported.
         # default here is 'report'
         if unknowns == "ignore":
-            seclevel_floor = min([v for k, v in seclevel_inventory.iteritems() if v != UNKNOWN])
+            seclevel_floor = min(
+                v for k, v in seclevel_inventory.iteritems() if v != UNKNOWN
+            )
+
         else:
             seclevel_floor = min(seclevel_inventory.values())
 
@@ -307,12 +315,14 @@ def enrich_tls(flow, kwargs):
         scs = None
 
     if 's_cert' in tls:
-        certs = list()
+        certs = []
         for x in tls['s_cert']:
-            tmp = dict()
-            tmp['cert_sig_alg'] = x['signature_algo']
-            tmp['sig_key_size'] = x['signature_key_size']
-            tmp['issuer'] = x['issuer']
+            tmp = {
+                'cert_sig_alg': x['signature_algo'],
+                'sig_key_size': x['signature_key_size'],
+                'issuer': x['issuer'],
+            }
+
             certs.append(tmp)
     else:
         certs = None
@@ -323,23 +333,22 @@ def enrich_tls(flow, kwargs):
     certs_seclevel, certs_concerns = get_certs_seclevel(seclevel_policy, certs)
     scs_seclevel, scs_concerns = get_scs_seclevel(seclevel_policy, scs, client_key_length)
 
-    tls_sec_info = {}
     concerns = certs_concerns + scs_concerns
     seclevels = [ certs_seclevel, scs_seclevel ]
 
     classification = seclevel_policy.seclevel(min(x for x in seclevels if x is not None))
 
-    if not concerns:
-        tls_sec_info["seclevel"] = classification
-    else:
-        tls_sec_info["seclevel"] = { "classification": classification,
-                                           "concerns": concerns }
+    tls_sec_info = {
+        "seclevel": {"classification": classification, "concerns": concerns}
+        if concerns
+        else classification
+    }
 
     # if compliance argument was passed, assess and add to tls_sec_info. It should be noted that this is a soft
     # check on whether or not the selected cipher suite would be acceptable to the specified compliance policy
     #
     if kwargs["compliance"]:
         for policy in kwargs["compliance"]:
-            tls_sec_info[policy + "_compliant"] = check_compliance(policy, scs)
+            tls_sec_info[f"{policy}_compliant"] = check_compliance(policy, scs)
 
     return tls_sec_info

@@ -156,28 +156,24 @@ class DataParser:
             return None
 
         data = []
-        if self.compact:
-            numRows = 10
-            binSize = 50.0
-        else:
-            numRows = 30
-            binSize = 50.0
+        numRows = 10 if self.compact else 30
+        binSize = 50.0
         for flow in self.flows:
             transMat = np.zeros((numRows,numRows))
             if len(flow['packets']) == 0:
                 continue
             elif len(flow['packets']) == 1:
-                curIPT = min(int(flow['packets'][0]['ipt']/float(binSize)),numRows-1)
+                curIPT = min(int(flow['packets'][0]['ipt'] / binSize), numRows-1)
                 transMat[curIPT,curIPT] = 1
                 data.append(list(transMat.flatten()))
                 continue
 
             # get raw transition counts
             for i in range(1,len(flow['packets'])):
-                prevIPT = min(int(flow['packets'][i-1]['ipt']/float(binSize)),numRows-1)
-                curIPT = min(int(flow['packets'][i]['ipt']/float(binSize)),numRows-1)
+                prevIPT = min(int(flow['packets'][i-1]['ipt'] / binSize), numRows-1)
+                curIPT = min(int(flow['packets'][i]['ipt'] / binSize), numRows-1)
                 transMat[prevIPT,curIPT] += 1
-                
+
             # get empirical transition probabilities
             for i in range(numRows):
                 if float(np.sum(transMat[i:i+1])) != 0:
@@ -200,14 +196,14 @@ class DataParser:
 
             key = flow['sa'].replace('.','')+flow['da'].replace('.','')+str(flow['sp'])+str(flow['dp'])+str(flow['pr'])
 
-            if flow['dp'] != None:
+            if flow['dp'] is None:
+                tmp.append(0) # ICMP/etc.
+            else:
                 tmp.append(float(flow['dp'])) # destination port
-            else:
+            if flow['sp'] is None:
                 tmp.append(0) # ICMP/etc.
-            if flow['sp'] != None:
+            else:
                 tmp.append(float(flow['sp'])) # source port
-            else:
-                tmp.append(0) # ICMP/etc.
             if 'num_pkts_in' in flow:
                 tmp.append(flow['num_pkts_in']) # inbound packets
             else:
@@ -228,13 +224,9 @@ class DataParser:
             if flow['packets'] == []:
                 tmp.append(0)
             else:
-                time = 0
-                for packet in flow['packets']:
-                    time += packet['ipt']
+                time = sum(packet['ipt'] for packet in flow['packets'])
                 tmp.append(time)
 
             data.append(tmp)
 
-        if data == []:
-            return None
-        return data
+        return data or None

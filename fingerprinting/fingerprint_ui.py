@@ -74,9 +74,12 @@ def fingerprint(pcap_file=None):
     if pcap_file == 'upload' and request.files.get('upload') != None:
         upload = request.files.get('upload')
         dir_name = tempfile.mkdtemp()
-        upload.save(dir_name + 'temp.pcap')
+        upload.save(f'{dir_name}temp.pcap')
 
-        fps_ = fingerprinter.extract_fingerprints([dir_name + 'temp.pcap'], detailed=True)
+        fps_ = fingerprinter.extract_fingerprints(
+            [f'{dir_name}temp.pcap'], detailed=True
+        )
+
 
     # clean up temporary directories
     if dir_name != None and os.path.isdir(dir_name):
@@ -102,6 +105,6 @@ def client_info(client_ip):
 
 @route('/static/<filename:path>')
 def send_static(filename):
-    return static_file(filename, root=dir_path+'/static/')
+    return static_file(filename, root=f'{dir_path}/static/')
 
 run(host='localhost', port=8080)

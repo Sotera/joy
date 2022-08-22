@@ -55,9 +55,9 @@ class ValidateExporter(object):
     def __init__(self, paths, compare_keys=['sa','da','sp','dp','pr']):
         self.paths = paths
         self.compare_keys = compare_keys
-        self.ipfix_flows = list()
-        self.sniff_flows = list()
-        self.corrupt_flows = list()
+        self.ipfix_flows = []
+        self.sniff_flows = []
+        self.corrupt_flows = []
         self.tmp_outputs = {'sniff': 'tmp-ipfix-sniff.json',
                             'export': 'tmp-ipfix-export.json',
                             'collect': 'tmp-ipfix-collect.json',
@@ -193,22 +193,18 @@ class ValidateExporter(object):
         # Compare the two results
         for ipfix_flow in self.ipfix_flows:
             corrupt = True
-            if not 'sa' in ipfix_flow:
+            if 'sa' not in ipfix_flow or ipfix_flow['dp'] == 4739:
                 # Optimize prelim check to see if a flow object
                 continue
-            elif ipfix_flow['dp'] == 4739:
-                # Ignore the exporter -> collector initial packet
-                continue
-
             for sniff_flow in self.sniff_flows:
-                if not 'sa' in sniff_flow:
+                if 'sa' not in sniff_flow:
                     # Optimize prelim check to see if a flow object
                     continue
 
                 match = True
                 for key in self.compare_keys:
                     try:
-                        if not ipfix_flow[key] == sniff_flow[key]:
+                        if ipfix_flow[key] != sniff_flow[key]:
                             # One of the key/value pairs did not match
                             match = False
                             break
@@ -227,7 +223,7 @@ class ValidateExporter(object):
         if self.corrupt_flows:
             # Log the corrupt flows
             for flow in self.corrupt_flows:
-                logger.warning('Corrupt flow --> ' + str(flow))
+                logger.warning(f'Corrupt flow --> {str(flow)}')
 
             self._cleanup_tmp_files()
             logger.error("Failure, corruption detected")
@@ -245,8 +241,7 @@ def test_unix_os():
     """
     cur_dir = os.path.dirname(__file__)
 
-    paths = dict()
-    paths['exec'] = os.path.join(cur_dir, '../../bin/joy')
+    paths = {'exec': os.path.join(cur_dir, '../../bin/joy')}
     paths['pcap'] = os.path.join(cur_dir, '../pcaps/sample.pcap')
 
     validate_exporter = ValidateExporter(paths=paths)

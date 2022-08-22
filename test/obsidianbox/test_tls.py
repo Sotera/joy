@@ -67,10 +67,10 @@ def generate_baseline(paths):
 
     # Make the names for the baseline files
     if not flag_base_generic:
-        base_file_tls10 = str(uuid.uuid4()) + '_base-tls10.json.gz'
-        base_file_tls11 = str(uuid.uuid4()) + '_base-tls11.json.gz'
-        base_file_tls12 = str(uuid.uuid4()) + '_base-tls12.json.gz'
-        # base_file_tls13 = str(uuid.uuid4()) + '_base-tls13.json.gz'
+        base_file_tls10 = f'{str(uuid.uuid4())}_base-tls10.json.gz'
+        base_file_tls11 = f'{str(uuid.uuid4())}_base-tls11.json.gz'
+        base_file_tls12 = f'{str(uuid.uuid4())}_base-tls12.json.gz'
+            # base_file_tls13 = str(uuid.uuid4()) + '_base-tls13.json.gz'
     else:
         base_file_tls10 = 'base-tls10.json.gz'
         base_file_tls11 = 'base-tls11.json.gz'
@@ -84,15 +84,20 @@ def generate_baseline(paths):
                      # {'base': base_file_tls13, 'pcap': path_tls13_pcap}
                      ]
 
-    # Generate the baselines
-    processes = list()
     logger.info("Generating TLS baselines...")
-    for files in base_and_pcap:
-        processes.append(subprocess.Popen([paths['exec'],
-                                           'output=' + files['base'],
-                                           'outdir=' + paths['baseline'],
-                                           'tls=1',
-                                           files['pcap']]))
+    processes = [
+        subprocess.Popen(
+            [
+                paths['exec'],
+                'output=' + files['base'],
+                'outdir=' + paths['baseline'],
+                'tls=1',
+                files['pcap'],
+            ]
+        )
+        for files in base_and_pcap
+    ]
+
     time.sleep(1)
 
     # End running subprocesses
@@ -108,15 +113,9 @@ class ValidateTLS(object):
         self.paths = paths
         self.compare_keys = ['sa','da','sp','dp','pr']
         self.corruption = False
-        self.new_flows = {'tls10': list(), 'tls11': list(), 'tls12': list(),
-                          # 'tls13': list()
-                          }
-        self.base_flows = {'tls10': list(), 'tls11': list(), 'tls12': list(),
-                           #'tls13': list()
-                           }
-        self.corrupt_new_flows = {'tls10': list(), 'tls11': list(), 'tls12': list(),
-                                  # 'tls13': list()
-                                  }
+        self.new_flows = {'tls10': [], 'tls11': [], 'tls12': []}
+        self.base_flows = {'tls10': [], 'tls11': [], 'tls12': []}
+        self.corrupt_new_flows = {'tls10': [], 'tls11': [], 'tls12': []}
         self.tmp_outputs = {'tls10': 'tmp-tls10.json',
                             'tls11': 'tmp-tls11.json',
                             'tls12': 'tmp-tls12.json',
@@ -143,7 +142,7 @@ class ValidateTLS(object):
                 raise IOError("No suitable baseline files exist")
 
             latest_file = max(base_files, key=os.path.getmtime)
-            logger.debug('latest ' + str(version) + ' base file selected ' + str(latest_file))
+            logger.debug(f'latest {str(version)} base file selected {str(latest_file)}')
 
             ft = FileType(latest_file)
             if ft.is_gz():
@@ -173,9 +172,16 @@ class ValidateTLS(object):
 
     def _run_tls(self):
         for version, flows in self.new_flows.iteritems():
-            pcap = os.path.abspath(os.path.join(self.paths['pcap'], version + '.pcap'))
-            proc = subprocess.Popen([self.paths['exec'],
-                                    'output=' + self.tmp_outputs[version], 'tls=1', pcap])
+            pcap = os.path.abspath(os.path.join(self.paths['pcap'], f'{version}.pcap'))
+            proc = subprocess.Popen(
+                [
+                    self.paths['exec'],
+                    f'output={self.tmp_outputs[version]}',
+                    'tls=1',
+                    pcap,
+                ]
+            )
+
 
             time.sleep(0.5)
 
@@ -244,7 +250,7 @@ class ValidateTLS(object):
             if self.corrupt_new_flows[version]:
                 # Log the corrupt flows
                 for flow in self.corrupt_new_flows[version]:
-                    logger.warning('Corrupt flow ' + str(version) + ' --> ' + str(flow))
+                    logger.warning(f'Corrupt flow {str(version)} --> {str(flow)}')
                 logger.warning('Please manually compare these corrupt flows against corresponding baseline file!')
 
         # Cleanup
@@ -263,11 +269,10 @@ def test_unix_os():
     """
     cur_dir = os.path.dirname(__file__)
 
-    paths = dict()
-    paths['exec'] = os.path.join(cur_dir, '../../bin/joy')
+    paths = {'exec': os.path.join(cur_dir, '../../bin/joy')}
     paths['pcap'] = os.path.join(cur_dir, pcap_path)
     paths['baseline'] = os.path.join(cur_dir, baseline_path)
-    logger.debug("paths... " + str(paths))
+    logger.debug(f"paths... {paths}")
 
     if flag_generate_base is True:
         # The user wants to make a set of baseline files

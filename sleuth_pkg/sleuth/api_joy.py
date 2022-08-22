@@ -136,18 +136,13 @@ class FlowStitchIterator(DictStreamIterator):
         for k, v in f2.items():
             if k not in f1:
                 f1[k] = f2[k]
-            else:
-                if k == 'time_end':
-                    f1[k] = max(f1[k], f2[k])
-                elif k == 'num_pkts_in' or k == 'bytes_in':
-                    f1[k] += f2[k]
-                elif k == 'num_pkts_out' or k == 'bytes_out':
-                    f1[k] += f2[k]
-                elif k == 'byte_dist':
-                    for i, e in enumerate(f2[k]):
-                        f1[k][i] += e
-                else:
-                    pass
+            elif k == 'time_end':
+                f1[k] = max(f1[k], f2[k])
+            elif k in ['num_pkts_in', 'bytes_in', 'num_pkts_out', 'bytes_out']:
+                f1[k] += f2[k]
+            elif k == 'byte_dist':
+                for i, e in enumerate(f2[k]):
+                    f1[k][i] += e
             return f1
 
     # merge f2 into f1, where f2 is in the reverse direction to f1, and
@@ -155,14 +150,7 @@ class FlowStitchIterator(DictStreamIterator):
     #
     def merge_reverse(self, f1, f2):
         for k, v in f2.items():
-            if k not in f1:
-                if k == 'num_pkts_out':
-                    f1['num_pkt_in'] += f2[k]
-                elif k == 'bytes_out':
-                    f1['bytes_in'] += f2[k]
-                else:
-                    f1[k] = f2[k]
-            else:
+            if k in f1:
                 if k == 'time_end':
                     f1[k] = max(f1[k], f2[k])
                 elif k == 'num_pkts_in':
@@ -172,8 +160,12 @@ class FlowStitchIterator(DictStreamIterator):
                 elif k == 'byte_dist':
                     for i, e in enumerate(f2[k]):
                         f1[k][i] += e
-                else:
-                    pass
+            elif k == 'num_pkts_out':
+                f1['num_pkt_in'] += f2[k]
+            elif k == 'bytes_out':
+                f1['bytes_in'] += f2[k]
+            else:
+                f1[k] = f2[k]
             return f1
 
 class DNSLinkedFlowEnrichIterator(DictStreamIterator):
@@ -238,20 +230,17 @@ class PcapLoader:
         """
         if self.file.endswith('.pcap'):
             return True
-        else:
             # Look inside the file and check for pcap magic number
-            if sys.byteorder == 'little':
-                magic_number = bytearray.fromhex('d4 c3 b2 a1')
-            else:
-                magic_number = bytearray.fromhex('a1 b2 c3 d4')
+        magic_number = (
+            bytearray.fromhex('d4 c3 b2 a1')
+            if sys.byteorder == 'little'
+            else bytearray.fromhex('a1 b2 c3 d4')
+        )
 
-            with open(self.file, 'rb') as f:
-                ba = bytearray(f.readline())
+        with open(self.file, 'rb') as f:
+            ba = bytearray(f.readline())
 
-                if ba[:4] == magic_number:
-                    return True
-                else:
-                    return False
+            return ba[:4] == magic_number
 
     def run(self):
         """
@@ -270,7 +259,7 @@ class PcapLoader:
                             'ssh=1', 'entropy=1', 'payload=1', 'ppi=1', 'fpx=1']
 
         # Construct the commands
-        command = ['joy', 'outdir=' + temp_json_dir, 'output=' + temp_json_filename]
+        command = ['joy', f'outdir={temp_json_dir}', f'output={temp_json_filename}']
         command += enabled_features
         command.append(os.path.join(cur_dir, self.file))
 
@@ -283,23 +272,21 @@ class PcapLoader:
         try:
             subprocess.call(command)
         except OSError as e:
-            if e.errno == os.errno.ENOENT:
-                # Look within the same directory where sleuth lives.
-                try:
-                    subprocess.call(command_local)
-                except OSError as ee:
-                    if ee.errno == os.errno.ENOENT:
-                        # Look in typical source location
-                        try:
-                            subprocess.call(command_source)
-                        except OSError as eee:
-                            if eee.errno == os.errno.ENOENT:
-                                print('\033[91m' + 'error: could not locate "joy" executable. exiting.' + '\033[0m')
-                                sys.exit(1)
-                    else:
-                        raise
-            else:
+            if e.errno != os.errno.ENOENT:
                 raise
 
+                # Look within the same directory where sleuth lives.
+            try:
+                subprocess.call(command_local)
+            except OSError as ee:
+                if ee.errno != os.errno.ENOENT:
+                    raise
+                # Look in typical source location
+                try:
+                    subprocess.call(command_source)
+                except OSError as eee:
+                    if eee.errno == os.errno.ENOENT:
+                        print('\033[91m' + 'error: could not locate "joy" executable. exiting.' + '\033[0m')
+                        sys.exit(1)
         # Set flag indicating the temporary JSON file was made.
         self.temp_json['created'] = True
