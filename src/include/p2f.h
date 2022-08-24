@@ -116,6 +116,10 @@ typedef struct tcp_retrans_ {
     uint16_t len;
 } tcp_retrans_t;
 
+typedef struct mac_addr_ {
+    unsigned char bytes[6];
+} mac_addr_t;
+
 #include "procwatch.h"
 #include "config.h"
 
@@ -141,6 +145,10 @@ typedef struct flow_record_ {
     uint8_t np;                           /*!< number of packets                   */
     uint8_t op;                           /*!< number of packets (w/nonzero data)  */
     uint16_t ob;                          /*!< number of bytes of application data */
+
+    mac_addr_t src_mac;                   /*!< Source MAC address                  */
+    mac_addr_t dst_mac;                   /*!< Destination MAC address             */
+
     struct timeval start;                 /*!< start time                          */ 
     struct timeval end;                   /*!< end time                            */
     uint16_t last_pkt_len;                /*!< last observed appdata length        */
@@ -153,7 +161,7 @@ typedef struct flow_record_ {
     double bd_mean;
     double bd_variance;
     header_description_t hd;              /*!< header description (proto ident)    */
-    bool idp_packet;                   /*!< determines if packet is used for IDP */
+    bool idp_packet;                      /*!< determines if packet is used for IDP */
     int32_t idp_seq_num;                  /*!< marks the SYN packet for IDP determination */
     void *idp;
     uint16_t idp_len;
