@@ -27,3 +27,6 @@ safe_c_stub/src/.dirstamp
 src/.deps/
 src/.dirstamp
 stamp-h1
+joy-output
+joy.bin
+bin/joy_static
