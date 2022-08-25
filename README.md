@@ -14,6 +14,12 @@
 
 Addendum: For our most recent network fingerprinting tools and data, please see [Mercury](https://github.com/cisco/mercury).
 
+## Jacobs Fork
+
+This fork of Joy makes minor modifications for our machine learning work:
+* Pass source and destination MAC addresses through as unique identifiers.
+* TBD: Byte histograms for the first 5 packets
+
 ## Overview
 
 Joy is a BSD-licensed libpcap-based software package for extracting
