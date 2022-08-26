@@ -120,6 +120,12 @@ typedef struct mac_addr_ {
     unsigned char bytes[6];
 } mac_addr_t;
 
+// adding struct for storage of byte dist for each packet:
+typedef struct byte_dist_arr_
+{
+    uint32_t byte_count[256];
+} byte_dist_arr_t;
+
 #include "procwatch.h"
 #include "config.h"
 
@@ -135,6 +141,7 @@ extern FILE *info;
 #define MAX_NUM_PKT_LEN 200
 #define MAX_IDP 1500
 #define MAX_TCP_RETRANS_BUFFER 10
+#define MAX_NUM_PKT_BYTE_DIST_ARR 10
 
 typedef struct flow_record_ {
     flow_key_t key;                       /*!< identifies flow by 5-tuple          */
@@ -148,6 +155,7 @@ typedef struct flow_record_ {
 
     mac_addr_t src_mac;                   /*!< Source MAC address                  */
     mac_addr_t dst_mac;                   /*!< Destination MAC address             */
+    byte_dist_arr_t byte_dist_array[MAX_NUM_PKT_BYTE_DIST_ARR]; /* list of byte dist array for each packet*/
 
     struct timeval start;                 /*!< start time                          */ 
     struct timeval end;                   /*!< end time                            */

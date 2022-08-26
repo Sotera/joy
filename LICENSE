@@ -33,3 +33,9 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+/* 
+ * NB: This version modified for Jacobs M51 IoT Classifier: outputs MAC 
+ * addresses and byte_dist_per_packet for up to 10 packets.
+ *
+ */

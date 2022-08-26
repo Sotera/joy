@@ -42,6 +42,9 @@
  *
  * \brief this file contains the functions relating to flow_records,
  * flow_keys, and the management of the flow cache
+ *
+ * \brief this version modified for Jacobs M51 IoT Classifier to
+ * output byte_dist_per_packet for up to 10 packets.
  */
 
 #ifdef WIN32
@@ -866,6 +869,7 @@ void flow_record_update_byte_count (flow_record_t *f, const void *x, unsigned in
     const unsigned char *data = x;
     unsigned int i;
     unsigned int current_count = 0;
+    unsigned int curr_packet_num = 0;
 
     /*
      * implementation note: The spec says that 4000 octets is enough of a
@@ -876,12 +880,21 @@ void flow_record_update_byte_count (flow_record_t *f, const void *x, unsigned in
 
     /* octet count was already incremented before processing this payload */
     current_count = f->ob - len;
+    curr_packet_num = f->np;
 
     if (glb_config->byte_distribution || glb_config->report_entropy) {
         if (current_count < ETTA_MIN_OCTETS) {
             for (i=0; i<len; i++) {
                 f->byte_count[data[i]]++;
                 current_count++;
+
+                // add byte count array for each packet update:
+                if (curr_packet_num < MAX_NUM_PKT_BYTE_DIST_ARR)
+                {
+                    f->byte_dist_array[curr_packet_num].byte_count[data[i]]++;
+                }
+                // zprintf('NEW BYTE DIST ARRAY added and updating in flow record update');
+
                 if (current_count >= ETTA_MIN_OCTETS) {
                    break;
                 }
@@ -1285,6 +1298,7 @@ static const flow_record_t *get_client_flow(const flow_record_t *a,
 static void flow_record_print_json
  (joy_ctx_data *ctx, const flow_record_t *record) {
     unsigned int i, j, imax, jmax;
+    unsigned int iii, jjj; // for byte_dist_array
     struct timeval ts, ts_last, ts_start, ts_end, ts_tmp;
     const flow_record_t *rec = NULL;
     unsigned int pkt_len;
@@ -1497,6 +1511,7 @@ static void flow_record_print_json
         uint32_t compact_tmp[16];
         unsigned int num_bytes;
         double mean = 0.0, variance = 0.0;
+        byte_dist_arr_t byte_dist_array[MAX_NUM_PKT_BYTE_DIST_ARR];
 
         /*
          * Sum up the byte_count array for outbound and inbound flows,
@@ -1527,6 +1542,16 @@ static void flow_record_print_json
             for (i=0; i<256; i++) {
                       tmp[i] = rec->byte_count[i] + rec->twin->byte_count[i];
             }
+
+            for (iii = 0; iii < MAX_NUM_PKT_BYTE_DIST_ARR; iii++)
+            {
+                for (jjj = 0; jjj < 256; jjj++)
+                {
+                    byte_dist_array[iii].byte_count[jjj] = rec->byte_dist_array[iii].byte_count[jjj];
+                }
+                reduce_bd_bits(byte_dist_array[iii].byte_count, 256);
+            }
+
             for (i=0; i<16; i++) {
                       compact_tmp[i] = rec->compact_byte_count[i] + rec->twin->compact_byte_count[i];
             }
@@ -1565,17 +1590,35 @@ static void flow_record_print_json
                 zprintf(ctx->output, ",\"byte_dist_std\":%f", variance);
             }
 
-        }
-
-        if (glb_config->compact_byte_distribution) {
-            reduce_bd_bits(compact_tmp, 16);
-            compact_array = compact_tmp;
-
-            zprintf(ctx->output, ",\"compact_byte_dist\":[");
-            for (i = 0; i < 15; i++) {
-                zprintf(ctx->output, "%u,", (unsigned char)compact_array[i]);
+            zprintf(ctx->output, ",\"byte_dist_per_packet\":[");
+            for (iii = 0; iii < MAX_NUM_PKT_BYTE_DIST_ARR; iii++)
+            {
+                zprintf(ctx->output, "[", (unsigned char)1);
+                for (jjj = 0; jjj < 255; jjj++)
+                {
+                    // rec->byte_dist_array[iii].byte_count[jjj];
+                    zprintf(ctx->output, "%u,", (unsigned char)byte_dist_array[iii].byte_count[jjj]);
+                }
+                zprintf(ctx->output, "%u]", (unsigned char)byte_dist_array[iii].byte_count[jjj]);
+                if (iii != MAX_NUM_PKT_BYTE_DIST_ARR - 1)
+                {
+                    zprintf(ctx->output, ",");
+                }
             }
-            zprintf(ctx->output, "%u]", (unsigned char)compact_array[i]);
+            zprintf(ctx->output, "]", (unsigned char)1);
+
+            if (glb_config->compact_byte_distribution)
+            {
+                reduce_bd_bits(compact_tmp, 16);
+                compact_array = compact_tmp;
+
+                zprintf(ctx->output, ",\"compact_byte_dist\":[");
+                for (i = 0; i < 15; i++)
+                {
+                    zprintf(ctx->output, "%u,", (unsigned char)compact_array[i]);
+                }
+                zprintf(ctx->output, "%u]", (unsigned char)compact_array[i]);
+            }
         }
 
         if (glb_config->report_entropy) {

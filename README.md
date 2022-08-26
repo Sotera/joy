@@ -16,9 +16,12 @@ Addendum: For our most recent network fingerprinting tools and data, please see 
 
 ## Jacobs Fork
 
-This fork of Joy makes minor modifications for our machine learning work:
-* Pass source and destination MAC addresses through as unique identifiers.
-* TBD: Byte histograms for the first 5 packets
+This fork of Joy makes minor modifications for our M51 IoT Classifier:
+* Output byte_dist_per_packet: byte histograms for the first 5-10 packets.
+  These are used in the language model (autoencoder with attention).
+* Output sm and dm, source and destination MAC addresses.
+  These provide unique identifiers during training.
+
 
 ## Overview
 

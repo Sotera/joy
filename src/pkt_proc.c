@@ -39,6 +39,9 @@
  *
  * \brief packet processing function implementation
  *
+ * \brief this version modified for Jacobs M51 IoT Classifier
+ * to outputs MAC addresses as unique IDs
+ *
  */
 #include <stdio.h>
 #include <pcap.h>
