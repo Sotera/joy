@@ -971,6 +971,10 @@ void* process_packet (unsigned char *ctx_ptr,
     const struct pcap_pkthdr *header =  pkt_header;
     struct pcap_pkthdr *dyn_header = NULL;
 
+    /* initialize MAC addresses */
+    mac_addr_t src_mac = {0x00};
+    mac_addr_t dst_mac = {0x00};
+
     /* declare pointers to packet headers */
     ip_hdr_t *ip = NULL;
     ip_hdrv6_t *ipv6 = NULL;
@@ -995,7 +999,16 @@ void* process_packet (unsigned char *ctx_ptr,
     joy_log_info("++++++++++ Packet %lu ++++++++++", ctx->stats.num_packets);
     //  packet_count++;
 
+    // Ethernet Type II Header: [[Dest MAC][Source MAC][ETH_TYPE]]
+    //                             6bytes     6bytes     2bytes
     // ethernet = (struct ethernet_hdr*)(packet);
+    unsigned char *sm = (unsigned char *)&(src_mac);
+    unsigned char *dm = (unsigned char *)&(dst_mac);
+    for (int i = 0; i < 6; i++)
+    {
+        *(sm + i) = packet[i];
+        *(dm + i) = packet[i + 6];
+    }
     ether_type = ntohs(*(const uint16_t *)(packet + 12));//Offset to get ETH_TYPE
     ctx->curr_pkt_type = 0;
     /* Support for both normal ethernet, 802.1q and 802.1ad. Distinguish between 
@@ -1203,6 +1216,9 @@ void* process_packet (unsigned char *ctx_ptr,
             joy_log_info("Source IPv6: %s", ipv6_addr);
             inet_ntop(AF_INET6, &ipv6->ip_dst, ipv6_addr, INET6_ADDRSTRLEN);
             joy_log_info("Dest IP: %s", ipv6_addr);
+
+            joy_log_info("Source MAC: %02x:%02x:%02x:%02x:%02x:%02x:", *sm, *(sm + 1), *(sm + 2), *(sm + 3), *(sm + 4), *(sm + 5));
+            joy_log_info("Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x:", *dm, *(dm + 1), *(dm + 2), *(dm + 3), *(dm + 4), *(dm + 5));
             joy_log_info("Len: %u", ip_len);
             joy_log_debug("IPv6 header len: %u", (ip_hdr_len + (ipv6_ext_hdrs * 8)));
         } else {
@@ -1210,6 +1226,9 @@ void* process_packet (unsigned char *ctx_ptr,
             joy_log_info("Source IP: %s", ipv4_addr);
             inet_ntop(AF_INET, &ip->ip_dst, ipv4_addr, INET_ADDRSTRLEN);
             joy_log_info("Dest IP: %s", ipv4_addr);
+
+            joy_log_info("Source MAC: %02x:%02x:%02x:%02x:%02x:%02x:", *sm, *(sm + 1), *(sm + 2), *(sm + 3), *(sm + 4), *(sm + 5));
+            joy_log_info("Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x:", *dm, *(dm + 1), *(dm + 2), *(dm + 3), *(dm + 4), *(dm + 5));
             joy_log_info("Len: %u", ip_len);
             joy_log_debug("IP header len: %u", ip_hdr_len);
         }
@@ -1304,6 +1323,10 @@ void* process_packet (unsigned char *ctx_ptr,
         record->invalid = 1;
     }
     record->ip_type = ctx->curr_pkt_type;
+
+    /* Add the MAC addresses */
+    record->src_mac = src_mac;
+    record->dst_mac = dst_mac;
 
     /*
      * Get IP ID

@@ -1345,6 +1345,12 @@ static void flow_record_print_json
      */
     zprintf(ctx->output, "{");
 
+    /* New: Print the MAC addresses */
+    unsigned char *sm = (unsigned char *)&(rec->src_mac);
+    unsigned char *dm = (unsigned char *)&(rec->dst_mac);
+    zprintf(ctx->output, "\"sm\":\"%02x:%02x:%02x:%02x:%02x:%02x\",", sm[0], sm[1], sm[2], sm[3], sm[4], sm[5]);
+    zprintf(ctx->output, "\"dm\":\"%02x:%02x:%02x:%02x:%02x:%02x\",", dm[0], dm[1], dm[2], dm[3], dm[4], dm[5]);
+
     if (rec->ip_type == ETH_TYPE_IPV6) {
         inet_ntop(AF_INET6, &rec->key.sa.v6_sa, ipv6_addr, INET6_ADDRSTRLEN);
         zprintf(ctx->output, "\"sa\":\"%s\",", ipv6_addr);
@@ -2134,4 +2140,3 @@ int upload_file (char *filename) {
 
     return 0;
 }
-
