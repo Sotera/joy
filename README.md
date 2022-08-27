@@ -21,6 +21,7 @@ This fork of Joy makes minor modifications for our M51 IoT Classifier:
   These are used in the language model (autoencoder with attention).
 * Output sm and dm, source and destination MAC addresses.
   These provide unique identifiers during training.
+* Incorporate sourcery improvements to Python code.
 
 
 ## Overview
